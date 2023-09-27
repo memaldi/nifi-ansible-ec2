@@ -1,0 +1,41 @@
+---
+- hosts: nifi
+  tasks:
+  - name: Download NiFi
+    ansible.builtin.get_url:
+      url: https://dlcdn.apache.org/nifi/1.23.2/nifi-1.23.2-bin.zip
+      dest: /home/ec2-user
+
+  - name: Extract NiFi
+    ansible.builtin.command: unzip /home/ec2-user/nifi-1.23.2-bin.zip
+
+  - name: Install NiFi as a service
+    ansible.builtin.command: sudo /home/ec2-user/nifi-1.23.2/bin/nifi.sh install
+
+  - name: Start NiFi
+    ansible.builtin.command: sudo service nifi start
+
+  - name: Fetch nifi.properties config file
+    ansible.builtin.fetch:
+      src: /home/ec2-user/nifi-1.23.2/conf/nifi.properties
+      dest: "{{ playbook_dir }}/nifi.properties"
+      flat: true
+
+- hosts: localhost
+  tasks:
+  - name: Replace nifi.web.https.host by hadoop_master host
+    ansible.builtin.shell: sed -i 's/nifi.web.https.host=127.0.0.1/nifi.web.https.host=ec2-3-87-82-66.compute-1.amazonaws.com/g' {{playbook_dir}}/nifi.properties
+
+
+- hosts: nifi
+  tasks:
+  - name: Copy nifi.properties to nifi host
+    ansible.builtin.copy:
+      src: "{{playbook_dir}}/nifi.properties"
+      dest: /home/ec2-user/nifi-1.23.2/conf/nifi.properties
+
+  - name: Set NiFi username and password
+    ansible.builtin.command: /home/ec2-user/nifi-1.23.2/bin/nifi.sh set-single-user-credentials user nifipassword
+
+  - name: Start NiFi
+    ansible.builtin.command: sudo service nifi restart
